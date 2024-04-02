@@ -13,6 +13,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Conv2D, MaxPooling2D, Dropout, Flatten
 from keras.utils import to_categorical
 from keras import preprocessing
+from PIL import Image
 
 import matplotlib.pyplot as plt
 from matplotlib.image import imread
@@ -74,6 +75,24 @@ def translateNumberToCategory(number):
         categoryString = 'unknown'
     return categoryString
 
+# This function replicates the process of processing images from the 
+# pre-trained model (https://github.com/akash720/Facial-expression-recognition/blob/master/README.md)
+# so that the image input is as similarly formated as possible to training data
+def processImage(imageFilePath):
+    imageToCheck = Image.open(imageFilePath)
+    
+    # Resize and re-sample image, the model originally used the ANTIALIAS resampling method
+    # but this was deprecated in the current version of pillow
+    resizedImage = imageToCheck.resize((48,48), Image.LANCZOS)
+    resizedImage = numpy.array(resizedImage)
+    grayscaleImage = cv2.cvtColor(resizedImage, cv2.COLOR_BGR2GRAY)
+
+    # Scale pixel values to be in the range [0,1]
+    scaledImage = grayscaleImage/255
+
+    # Reshaping image as done in the pre-trained model pre-processing
+    reshapeImage = scaledImage.reshape(-1, 48, 48, 1)
+    return reshapeImage
 
 # ---- Main Code
 
@@ -82,7 +101,6 @@ arguments = sys.argv
 # skip video capture and use existing images (for debugging purposes)
 captureVideo = len(arguments) == 1
 if captureVideo:
-    print("STARTING VIDEO CAPTURE")
 
     # Load the face detection model from cv2
     # used the haarcascade frontal face model since it is relatively fast and a common pre-trained model for
@@ -129,53 +147,52 @@ pretrainedModel = load_model("my_model.h5")
 pretrainedModel.summary()
 
 #Extract pixel values for each image in the faces folder
-pixels = []
-imageSize = (48, 48)
 facesFolder = "faces/"
 imageList = os.listdir(facesFolder)
 
+predictionLabels = []
+
 for imageFile in imageList:
-    print(imageFile)
-    grayscaleImage = preprocessing.image.load_img(facesFolder + imageFile, target_size=imageSize, color_mode='grayscale')
-    grayscaleImageArray = numpy.array(grayscaleImage)
 
-    pixels.append((grayscaleImageArray).reshape(48, 48, 1))
+    imageFilePath = facesFolder + imageFile
+    processedImage = processImage(imageFilePath)
 
-pixels = numpy.array(pixels)
-
-predictionLabels = numpy.argmax(pretrainedModel.predict(pixels), axis=1)
+    predictionLabels.append(numpy.argmax(pretrainedModel.predict(processedImage)))
 
 
 ## TODO: remove all code below, this is for testing purposes only ########
 
-num_cols = 5  # Number of columns in the grid
-num_rows = -(-len(imageList) // num_cols)  # Calculate the number of rows needed to accommodate all images
+def testing_DELETE_ME(translateNumberToCategory, facesFolder, imageList, predictionLabels):
+    num_cols = 5  # Number of columns in the grid
+    num_rows = -(-len(imageList) // num_cols)  # Calculate the number of rows needed to accommodate all images
 
 
-predictionIndex = 0
-fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(12, 8))
+    predictionIndex = 0
+    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(12, 8))
 
-for i, faceImage_filename in enumerate(imageList):
-    faceImage = imread(facesFolder + faceImage_filename)
-    label = translateNumberToCategory(predictionLabels[predictionIndex])
+    for i, faceImage_filename in enumerate(imageList):
+        faceImage = imread(facesFolder + faceImage_filename)
+        label = translateNumberToCategory(predictionLabels[predictionIndex])
 
-    imageTitle = f"{label} ({faceImage_filename})"
-    row = i // num_cols  # Calculate the row index for this subplot
-    col = i % num_cols   # Calculate the column index for this subplot
+        imageTitle = f"{label} ({faceImage_filename})"
+        row = i // num_cols  # Calculate the row index for this subplot
+        col = i % num_cols   # Calculate the column index for this subplot
 
-    axs[row, col].imshow(faceImage)
-    axs[row, col].set_title(imageTitle)
-    axs[row, col].axis('off')
-    predictionIndex += 1
+        axs[row, col].imshow(faceImage)
+        axs[row, col].set_title(imageTitle)
+        axs[row, col].axis('off')
+        predictionIndex += 1
 
 # Hide any remaining empty subplots
-for i in range(len(imageList), num_rows * num_cols):
-    row = i // num_cols
-    col = i % num_cols
-    axs[row, col].axis('off')
-    axs[row, col].set_visible(False)
+    for i in range(len(imageList), num_rows * num_cols):
+        row = i // num_cols
+        col = i % num_cols
+        axs[row, col].axis('off')
+        axs[row, col].set_visible(False)
 
-plt.tight_layout()
-plt.show()
+    plt.tight_layout()
+    plt.show()
+
+testing_DELETE_ME(translateNumberToCategory, facesFolder, imageList, predictionLabels)  
 
 ####################################################################
