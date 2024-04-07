@@ -18,7 +18,7 @@ import wave
 def loadAudioSentimentModelBase():
     ### LOADING MODELS 
     # STT Model
-    stt_model = whisper.load_model("base")
+    stt_model = whisper.load_model("base.en")
     return stt_model
 
 def loadAudioSentimentModel():
@@ -160,7 +160,7 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     # print(max_label, "  ", max_prob.item())
 
     #TODO-ARU: extract commands here
-    tricks = ["Stand", "Paw", "Turn", "Sit", "Bang"]
+    tricks = ["Stand", "Shake", "Turn", "Sit", "Bang"]
     command = ""
 
     for trick in tricks:
