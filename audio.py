@@ -160,7 +160,14 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     # print(max_label, "  ", max_prob.item())
 
     #TODO-ARU: extract commands here
+    tricks = ["Stand", "Paw", "Turn", "Sit", "Bang"]
     command = ""
+
+    for trick in tricks:
+    # Check if the trick is in the input text
+        if trick.lower() in text.lower():
+            # Assign the trick to command
+            command = trick
 
     results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
     #print(results)
