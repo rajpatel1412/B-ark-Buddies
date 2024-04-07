@@ -45,6 +45,37 @@ def loadAudioSentimentModel():
 #     tone_model = AutoModelForAudioClassification.from_pretrained("3loi/SER-Odyssey-Baseline-WavLM-Categorical-Attributes")
 #     return tone_model
 
+# for fusion
+def packageInputsForFusion(expressionLabel, confidence):
+    arousel = 0
+    valence = 0
+
+    # 1 is low/negative and 3 is high/positive
+    if expressionLabel == 'anger':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'disgust':
+        arousel = 2
+        valence = 1
+    elif expressionLabel == 'fear':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'joy':
+        arousel = 2
+        valence = 3
+    elif expressionLabel == 'sadness':
+        arousel = 1
+        valence = 1
+    elif expressionLabel == 'surprise':
+        arousel = 3
+        valence = 3
+    elif expressionLabel == 'neutral':
+        arousel = 2
+        valence = 2
+
+    packagedValues = (arousel, valence, confidence)
+    return packagedValues
+
 def runAudioRecognition(stt_model, sentiment_pipeline, results):
     ### COLLECTING AUDIO
     # Settings
@@ -128,15 +159,18 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     print(sentiment[0]['label'], "  ", sentiment[0]['score'])
     # print(max_label, "  ", max_prob.item())
 
-def main():
-    print("audio audio")
-    audioSentimentModelBase = loadAudioSentimentModelBase()
-    audioSentimentModel = loadAudioSentimentModel()
-    results = []
-    runAudioRecognition(audioSentimentModelBase, audioSentimentModel, results)
-    print("done")
+    results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score']))
+    print(results)
+
+# def main():
+#     print("audio audio")
+#     audioSentimentModelBase = loadAudioSentimentModelBase()
+#     audioSentimentModel = loadAudioSentimentModel()
+#     results = []
+#     runAudioRecognition(audioSentimentModelBase, audioSentimentModel, results)
+#     print("done")
 
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

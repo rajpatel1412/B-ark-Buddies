@@ -41,7 +41,7 @@ def createFaceImages(videoFrame, facesFromFrame, facesFolder):
         fileName = facesFolder + str(timestampForImageName) + "_face.jpg"
         cv2.imwrite(fileName, extractedFace)
 
-def extractFacesFromFrame(videoFrame):
+def extractFacesFromFrame(videoFrame, faceDetectionModel):
     # Convert frame to grayscale for more efficent face detection
     grayscaleVideoFrame = cv2.cvtColor(videoFrame, cv2.COLOR_BGR2GRAY)
 
@@ -101,7 +101,8 @@ def processImage(imageFilePath):
     return reshapeImage
 
 # for fusion
-def packageInputsForFusion(expressionLabel, confidence):
+def packageInputsForFusion(expressionValue, confidence):
+    expressionLabel = translateNumberToCategory(expressionValue)
     arousel = 0
     valence = 0
 
@@ -131,6 +132,27 @@ def packageInputsForFusion(expressionLabel, confidence):
     packagedValues = (arousel, valence, confidence)
     return packagedValues
 
+def selectPrediction(predictionList):
+    mostCommonValue = 0
+    mostCommonCount = 0
+
+    # find the most common value and store it's index
+    for value in predictionList:
+        count = predictionList.count(value)
+        if count > mostCommonCount:
+            mostCommonValue = value
+            mostCommonCount = count
+    
+    return mostCommonValue
+
+
+def findLastIndexOfMostCommonPrediction(predictionList, mostCommonValue):
+    lastIndexOfCommonValue = 0
+    for index in range(len(predictionList)):
+        if predictionList[index] == mostCommonValue:
+            lastIndexOfCommonValue = index
+    return lastIndexOfCommonValue
+
 # ---- Main Code
 def runFacialExpressionRecognition(pretrainedModel, results):
     # Load the face detection model from cv2
@@ -151,9 +173,9 @@ def runFacialExpressionRecognition(pretrainedModel, results):
         shutil.rmtree(facesFolder)
     os.makedirs(facesFolder)
 
-    iterationNumber = 0
-    maxNumIterations = 400
-    while iterationNumber < maxNumIterations:
+    # take 5 seconds of video
+    start_time = time.time()
+    while time.time() - start_time < 5:
         # Get frame to process from video camera
         status, videoFrame = videoCapture.read()
         
@@ -162,12 +184,10 @@ def runFacialExpressionRecognition(pretrainedModel, results):
             break
 
         # extract a list of faces from each frame
-        facesFromFrame = extractFacesFromFrame(videoFrame)
+        facesFromFrame = extractFacesFromFrame(videoFrame, faceDetectionModel)
 
         # Create jpgs from list of faces
         createFaceImages(videoFrame, facesFromFrame, facesFolder)
-
-        iterationNumber = iterationNumber + 1
 
     # Release the capture
     videoCapture.release()
@@ -192,4 +212,25 @@ def runFacialExpressionRecognition(pretrainedModel, results):
         # calculate confidence from probability
         confidencePercentage = probabilityDistribution[0][category] * 100
         confidence.append(confidencePercentage)
+    
+    selectedPrediction = selectPrediction(predictionLabels)
+    # print(selectedPrediction)
+    selectedPredictionIndex = findLastIndexOfMostCommonPrediction(predictionLabels, selectedPrediction)
+    selectedPredictionConfidence = confidence[selectedPredictionIndex]
+
+    results.append(packageInputsForFusion(selectedPrediction, selectedPredictionConfidence))
+    # print(results)
+
+
+
+# def main():
+#     print("audio audio")
+#     videoModel = loadFaceModel()
+#     results = []
+#     runFacialExpressionRecognition(videoModel, results)
+#     print("done")
+
+
+# if __name__ == "__main__":
+#     main()
 
