@@ -1,7 +1,8 @@
 # !pip install -U openai-whisper
 # !pip install librosa
 # !pip install torchaudio
-# !pip install git+https://github.com/speechbrain/speechbrain.git
+
+### IMPORTS 
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -11,6 +12,8 @@ import whisper
 from transformers import pipeline
 from transformers import AutoModelForAudioClassification
 import librosa, torch
+import pyaudio
+import wave
 
 ### LOADING MODELS 
 # STT Model
@@ -34,12 +37,49 @@ sentiment_pipeline = pipeline("text-classification", model="nateraw/bert-base-un
 
 # Tone analysis model
 tone_model = AutoModelForAudioClassification.from_pretrained("3loi/SER-Odyssey-Baseline-WavLM-Categorical-Attributes", trust_remote_code=True)
-audio = "c.mp4"
 
+### COLLECTING AUDIO
+# Settings
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+CHUNK = 1024
+RECORD_SECONDS = 5
+WAVE_OUTPUT_FILENAME = "output.wav"
+
+# Initialize pyaudio
+audio = pyaudio.PyAudio()
+
+# Start recording
+stream = audio.open(format=FORMAT, channels=CHANNELS,
+                    rate=RATE, input=True,
+                    frames_per_buffer=CHUNK)
+print("recording...")
+frames = []
+
+for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+    data = stream.read(CHUNK)
+    frames.append(data)
+print("finished recording")
+
+# Stop recording
+stream.stop_stream()
+stream.close()
+audio.terminate()
+
+# Save the recorded data as a WAV file
+wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+wf.setnchannels(CHANNELS)
+wf.setsampwidth(audio.get_sample_size(FORMAT))
+wf.setframerate(RATE)
+wf.writeframes(b''.join(frames))
+wf.close()
+
+audio_file = WAVE_OUTPUT_FILENAME
 
 ### Performing analysis 
 # STT
-transcription = stt_model.transcribe(audio)
+transcription = stt_model.transcribe(audio_file)
 text = transcription["text"]
 
 # Sentiment Analysis
@@ -51,7 +91,7 @@ sentiment = sentiment_pipeline(text)
 mean = tone_model.config.mean
 std = tone_model.config.std
 
-raw_wav, _ = librosa.load(audio, sr=tone_model.config.sampling_rate)
+raw_wav, _ = librosa.load(audio_file, sr=tone_model.config.sampling_rate)
 
 #normalize the audio by mean/std
 norm_wav = (raw_wav - mean) / (std+0.000001)
@@ -77,5 +117,5 @@ max_prob = probabilities[0, max_score_index.item()]
 
 # Print the results
 print(text)
-print(sentiment)
+print(sentiment[0]['label'], "  ", sentiment[0]['score'])
 print(max_label, "  ", max_prob.item())
