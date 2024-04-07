@@ -160,7 +160,7 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     # print(max_label, "  ", max_prob.item())
 
     #TODO-ARU: extract commands here
-    command = "nothing atm"
+    command = ""
 
     results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
     #print(results)
