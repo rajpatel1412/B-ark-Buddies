@@ -1,5 +1,6 @@
 import face
 import audio
+import game
 import threading
 import numpy
 
@@ -132,6 +133,11 @@ def main():
                 semnaticInputs = result
 
         fusedValues = fuseModalities(faceInputs, semnaticInputs)
+
+        playGameThread = threading.Thread(target=game.playGame, args=(fusedValues[0], fusedValues[1], fusedValues[2], fusedValues[3]))
+        playGameThread.start()
+        playGameThread.join()
+        
         print(fusedValues)
 
 
