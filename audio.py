@@ -46,7 +46,7 @@ def loadAudioSentimentModel():
 #     return tone_model
 
 # for fusion
-def packageInputsForFusion(expressionLabel, confidence):
+def packageInputsForFusion(expressionLabel, confidence, command):
     arousel = 0
     valence = 0
 
@@ -73,7 +73,7 @@ def packageInputsForFusion(expressionLabel, confidence):
         arousel = 2
         valence = 2
 
-    packagedValues = (arousel, valence, confidence)
+    packagedValues = ('semantic', arousel, valence, confidence, command)
     return packagedValues
 
 def runAudioRecognition(stt_model, sentiment_pipeline, results):
@@ -159,8 +159,11 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     print(sentiment[0]['label'], "  ", sentiment[0]['score'])
     # print(max_label, "  ", max_prob.item())
 
-    results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score']))
-    print(results)
+    #TODO-ARU: extract commands here
+    command = "nothing atm"
+
+    results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
+    #print(results)
 
 # def main():
 #     print("audio audio")

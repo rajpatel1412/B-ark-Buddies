@@ -129,7 +129,7 @@ def packageInputsForFusion(expressionValue, confidence):
         arousel = 2
         valence = 2
 
-    packagedValues = (arousel, valence, confidence)
+    packagedValues = ('face', arousel, valence, confidence)
     return packagedValues
 
 def selectPrediction(predictionList):
