@@ -219,7 +219,7 @@ def runFacialExpressionRecognition(pretrainedModel, results):
     selectedPredictionConfidence = confidence[selectedPredictionIndex]
 
     results.append(packageInputsForFusion(selectedPrediction, selectedPredictionConfidence))
-    # print(results)
+    print(results)
 
 
 
@@ -227,7 +227,8 @@ def runFacialExpressionRecognition(pretrainedModel, results):
 #     print("audio audio")
 #     videoModel = loadFaceModel()
 #     results = []
-#     runFacialExpressionRecognition(videoModel, results)
+#     while(1):
+#         runFacialExpressionRecognition(videoModel, results)
 #     print("done")
 
 

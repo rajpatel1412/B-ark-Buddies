@@ -40,13 +40,13 @@ def loadAudioSentimentModel():
     return sentiment_pipeline
 
 
-# def loadAudioToneModel():
-#     # Tone analysis model
-#     tone_model = AutoModelForAudioClassification.from_pretrained("3loi/SER-Odyssey-Baseline-WavLM-Categorical-Attributes")
-#     return tone_model
+def loadAudioToneModel():
+    # Tone analysis model
+    tone_model = pipeline("audio-classification", model="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
+    return tone_model
 
 # for fusion
-def packageInputsForFusion(expressionLabel, confidence, command):
+def packageSemmanticInputsForFusion(expressionLabel, confidence, command):
     arousel = 0
     valence = 0
 
@@ -76,7 +76,37 @@ def packageInputsForFusion(expressionLabel, confidence, command):
     packagedValues = ('semantic', arousel, valence, confidence, command)
     return packagedValues
 
-def runAudioRecognition(stt_model, sentiment_pipeline, results):
+def packageToneInputsForFusion(expressionLabel, confidence):
+    arousel = 0
+    valence = 0
+
+    # 1 is low/negative and 3 is high/positive
+    if expressionLabel == 'anger':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'disgust':
+        arousel = 2
+        valence = 1
+    elif expressionLabel == 'fear':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'joy':
+        arousel = 2
+        valence = 3
+    elif expressionLabel == 'sadness':
+        arousel = 1
+        valence = 1
+    elif expressionLabel == 'surprise':
+        arousel = 3
+        valence = 3
+    elif expressionLabel == 'neutral':
+        arousel = 2
+        valence = 2
+
+    packagedValues = ('tone', arousel, valence, confidence)
+    return packagedValues
+
+def runAudioRecognition(stt_model, sentiment_pipeline, audioToneModel, results):
     ### COLLECTING AUDIO
     # Settings
     FORMAT = pyaudio.paInt16
@@ -159,6 +189,9 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
     print(sentiment[0]['label'], "  ", sentiment[0]['score'])
     # print(max_label, "  ", max_prob.item())
 
+    tone = audioToneModel(audio_file)
+    print(tone[0]['label'], "  ", tone[0]['score'])
+
     #TODO-ARU: extract commands here
     tricks = ["Stand", "Shake", "Turn", "Sit", "Bang"]
     command = ""
@@ -169,18 +202,20 @@ def runAudioRecognition(stt_model, sentiment_pipeline, results):
             # Assign the trick to command
             command = trick
 
-    results.append(packageInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
+    results.append(packageSemmanticInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
+    results.append(packageToneInputsForFusion(tone[0]['label'], tone[0]['score'] * 100))
     #print(results)
 
-# def main():
-#     print("audio audio")
-#     audioSentimentModelBase = loadAudioSentimentModelBase()
-#     audioSentimentModel = loadAudioSentimentModel()
-#     results = []
-#     runAudioRecognition(audioSentimentModelBase, audioSentimentModel, results)
-#     print("done")
+def main():
+    print("audio audio")
+    audioSentimentModelBase = loadAudioSentimentModelBase()
+    audioSentimentModel = loadAudioSentimentModel()
+    audioToneModel = loadAudioToneModel()
+    results = []
+    runAudioRecognition(audioSentimentModelBase, audioSentimentModel, audioToneModel, results)
+    print("done")
 
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
