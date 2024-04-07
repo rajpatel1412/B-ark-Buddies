@@ -19,9 +19,15 @@ import matplotlib.pyplot as plt
 from matplotlib.image import imread
 import numpy
 
-import sys # for debugging (add argument no-video to use images from previous run)
-
 # ---- Helper Functions
+
+def loadFaceModel():
+    # model from: https://github.com/akash720/Facial-expression-recognition/blob/master/README.md
+    # Note: had to train it and then save it with a newer version of keras for some reason in google collab
+    pretrainedModel = load_model("my_model.h5")
+    return pretrainedModel
+
+
 def createFaceImages(videoFrame, facesFromFrame, facesFolder):
     for face in facesFromFrame:
         # Unpack data for each face
@@ -94,14 +100,39 @@ def processImage(imageFilePath):
     reshapeImage = scaledImage.reshape(-1, 48, 48, 1)
     return reshapeImage
 
+# for fusion
+def packageInputsForFusion(expressionLabel, confidence):
+    arousel = 0
+    valence = 0
+
+    # 1 is low/negative and 3 is high/positive
+    if expressionLabel == 'angry':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'disgust':
+        arousel = 2
+        valence = 1
+    elif expressionLabel == 'fear':
+        arousel = 3
+        valence = 1
+    elif expressionLabel == 'happy':
+        arousel = 2
+        valence = 3
+    elif expressionLabel == 'sad':
+        arousel = 1
+        valence = 1
+    elif expressionLabel == 'surprise':
+        arousel = 3
+        valence = 3
+    elif expressionLabel == 'neutral':
+        arousel = 2
+        valence = 2
+
+    packagedValues = (arousel, valence, confidence)
+    return packagedValues
+
 # ---- Main Code
-
-arguments = sys.argv
-
-# skip video capture and use existing images (for debugging purposes)
-captureVideo = len(arguments) == 1
-if captureVideo:
-
+def runFacialExpressionRecognition(pretrainedModel, results):
     # Load the face detection model from cv2
     # used the haarcascade frontal face model since it is relatively fast and a common pre-trained model for
     # facial detection
@@ -141,144 +172,24 @@ if captureVideo:
     # Release the capture
     videoCapture.release()
 
-# model from: https://github.com/akash720/Facial-expression-recognition/blob/master/README.md
-# Note: had to train it and then save it with a newer version of keras for some reason in google collab
-pretrainedModel = load_model("my_model.h5")
-pretrainedModel.summary()
+    #Extract pixel values for each image in the faces folder
+    facesFolder = "faces/"
+    imageList = os.listdir(facesFolder)
 
-#Extract pixel values for each image in the faces folder
-facesFolder = "faces/"
-imageList = os.listdir(facesFolder)
+    predictionLabels = []
+    confidence = []
 
-predictionLabels = []
-confidence = []
+    for imageFile in imageList:
+        # process the image
+        imageFilePath = facesFolder + imageFile
+        processedImage = processImage(imageFilePath)
 
-for imageFile in imageList:
+        # use model to predict
+        probabilityDistribution = pretrainedModel.predict(processedImage)
+        category = numpy.argmax(probabilityDistribution)
+        predictionLabels.append(category)
 
-    imageFilePath = facesFolder + imageFile
-    processedImage = processImage(imageFilePath)
+        # calculate confidence from probability
+        confidencePercentage = probabilityDistribution[0][category] * 100
+        confidence.append(confidencePercentage)
 
-    print("---")
-    probabilityDistribution = pretrainedModel.predict(processedImage)
-    print(probabilityDistribution)
-    category = numpy.argmax(probabilityDistribution)
-    print(category)
-
-    predictionLabels.append(category)
-    confidencePercentage = probabilityDistribution[0][category] * 100
-    confidence.append(confidencePercentage)
-    print(confidencePercentage)
-    print("---")
-
-
-## TODO: remove all code below, this is for testing purposes only ########
-
-def testing_DELETE_ME(translateNumberToCategory, facesFolder, imageList, predictionLabels):
-    num_cols = 5  # Number of columns in the grid
-    num_rows = -(-len(imageList) // num_cols)  # Calculate the number of rows needed to accommodate all images
-
-
-    predictionIndex = 0
-    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(12, 8))
-
-    for i, faceImage_filename in enumerate(imageList):
-        faceImage = imread(facesFolder + faceImage_filename)
-        label = translateNumberToCategory(predictionLabels[predictionIndex]) + "\n " + str(confidence[i]) + "%"
-
-        imageTitle = f"{label}\n({faceImage_filename})"
-        row = i // num_cols  # Calculate the row index for this subplot
-        col = i % num_cols   # Calculate the column index for this subplot
-
-        axs[row, col].imshow(faceImage)
-        axs[row, col].set_title(imageTitle)
-        axs[row, col].axis('off')
-        predictionIndex += 1
-
-# Hide any remaining empty subplots
-    for i in range(len(imageList), num_rows * num_cols):
-        row = i // num_cols
-        col = i % num_cols
-        axs[row, col].axis('off')
-        axs[row, col].set_visible(False)
-
-    plt.tight_layout()
-    plt.show()
-
-testing_DELETE_ME(translateNumberToCategory, facesFolder, imageList, predictionLabels)  
-
-####################################################################
-
-def packageInputsForFusion(expressionLabel, confidence):
-    arousel = 0
-    valence = 0
-
-    # 1 is low/negative and 3 is high/positive
-    if expressionLabel == 'angry':
-        arousel = 3
-        valence = 1
-    elif expressionLabel == 'disgust':
-        arousel = 2
-        valence = 1
-    elif expressionLabel == 'fear':
-        arousel = 3
-        valence = 1
-    elif expressionLabel == 'happy':
-        arousel = 2
-        valence = 3
-    elif expressionLabel == 'sad':
-        arousel = 1
-        valence = 1
-    elif expressionLabel == 'surprise':
-        arousel = 3
-        valence = 3
-    elif expressionLabel == 'neutral':
-        arousel = 2
-        valence = 2
-
-    packagedValues = (arousel, valence, confidence)
-    return packagedValues
-
-def performWeighting(valueA, confidenceA, valueB, confidenceB, valueC, confidenceC):
-    # values of 1 are places at index 0, values of 2 are places at index 2, values of 3 are places at index 2
-
-    # where the sorted values list holds [[confidence for values = 1], [confidence for values = 2], [confidence for values = 3]]
-    sortedValues = [[], [], []]
-    sortedValues[valueA - 1].append[confidenceA]
-    sortedValues[valueB - 1].append[confidenceB]
-    sortedValues[valueC -1].append[confidenceC]
-
-    # calculate average confidence for each value rating
-    averageConfidencePerValue = []
-    for valueCategory in sortedValues:
-        sumOfConfidences = sum(valueCategory)
-        numberOfConfidences = len(valueCategory)
-
-        averageConfidence = sumOfConfidences/numberOfConfidences
-
-        averageConfidencePerValue.append(averageConfidence)
-
-    predictedIndex = numpy.argmax(averageConfidencePerValue)
-    predictedValue = predictedIndex + 1
-    confidenceOfPrediction = averageConfidencePerValue[predictedIndex]
-
-    return (predictedValue, confidenceOfPrediction)
-
-
-def fuseModalities(facialInputs, sematicVoiceInput, toneVoiceInput):
-
-    # extract inputs for fusion
-    faceArousel, faceValence, faceConfidence = facialInputs
-    semanticArousel, semanticValence, semanticConfidence, command = sematicVoiceInput
-    toneArousel, toneValence, toneConfidence = toneVoiceInput
-
-    # preform weighting for arousel
-    predictedArousal, predictedArouselConfidence = performWeighting(faceArousel, faceConfidence, semanticArousel, semanticConfidence, toneArousel, toneConfidence)
-
-    # preform weighting for valence
-    predictedValence, predictedValenceConfidence = performWeighting(faceValence, faceConfidence, semanticValence, semanticConfidence, toneValence, toneConfidence)
-
-    # generate overall confidence
-    postFusionConfidence = (predictedArouselConfidence + predictedValenceConfidence)/2
-
-    # pack fusion output values
-    return (predictedArousal, predictedValence, postFusionConfidence, command)
