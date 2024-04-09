@@ -151,7 +151,7 @@ import game
 import threading
 import numpy
 import time
-import exit
+# import exit
 
 exitFlag = False
 
