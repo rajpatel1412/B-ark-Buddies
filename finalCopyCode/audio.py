@@ -1,40 +1,22 @@
-# !pip install -U openai-whisper
-# !pip install librosa
-# !pip install torchaudio
-
-### IMPORTS 
+# Suppress warning for a cleaner output
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+# Needed imports
 import whisper
 from transformers import pipeline
-from transformers import AutoModelForAudioClassification
 import librosa, torch
 import pyaudio
 import wave
 
 def loadSpeechToTextModel():
-    ### LOADING MODELS 
-    # STT Model
+    # Speech To Text Model
     sttModel = whisper.load_model("base.en")
     return sttModel
 
 def loadAudioSentimentModel():
     # Sentiment Analysis model
-    '''
-        More emotions however not a great accuracy
-        Possible outputs:
-            joy (or happiness): Indicating content that expresses joy, happiness, or pleasure.
-            anger: Reflecting content that expresses anger, irritation, or frustration.
-            fear: Signifying text that expresses fear, anxiety, or apprehension.
-            sadness: Identifying content that expresses sadness, gloominess, or disappointment.
-            disgust: Highlighting content that expresses disgust, revulsion, or contempt.
-            surprise: For content that expresses surprise, amazement, or shock.
-            neutral: Indicating content that doesn't strongly express any of the above emotions.
-        Wasn't able to successfully replicate all
-
-    '''
     sentimentPipeline = pipeline("text-classification", model="nateraw/bert-base-uncased-emotion")
     return sentimentPipeline
 
@@ -43,7 +25,7 @@ def loadAudioToneModel():
     toneModel = pipeline("audio-classification", model="ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
     return toneModel
 
-# for fusion
+# Encode sentiment outputs to be used as fusion inputs
 def packageSentimentInputsForFusion(expressionLabel, confidence, command):
     arousel = 0
     valence = 0
@@ -74,6 +56,7 @@ def packageSentimentInputsForFusion(expressionLabel, confidence, command):
     packagedValues = ('sentiment', arousel, valence, confidence, command)
     return packagedValues
 
+# Encode tone outputs to be used as fusion inputs 
 def packageToneInputsForFusion(expressionLabel, confidence):
     arousel = 0
     valence = 0
@@ -105,8 +88,7 @@ def packageToneInputsForFusion(expressionLabel, confidence):
     return packagedValues
 
 def runAudioRecognition(sttModel, sentimentPipeline, audioToneModel, results):
-    ### COLLECTING AUDIO
-    # Settings
+    # Settings for audio collection
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
     RATE = 44100
@@ -118,12 +100,11 @@ def runAudioRecognition(sttModel, sentimentPipeline, audioToneModel, results):
     audio = pyaudio.PyAudio()
 
     # Start recording
-    stream = audio.open(format=FORMAT, channels=CHANNELS,
-                        rate=RATE, input=True,
-                        frames_per_buffer=CHUNK)
+    stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
     print("recording...")
     frames = []
 
+    # Iteratively reading chunks of data from the stream and appending them to frame
     for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
         data = stream.read(CHUNK)
         frames.append(data)
@@ -145,10 +126,9 @@ def runAudioRecognition(sttModel, sentimentPipeline, audioToneModel, results):
     audioFile = WAVE_OUTPUT_FILENAME
 
     ### Performing analysis 
-    # STT
+    # SpeechToText
     transcription = sttModel.transcribe(audioFile)
     text = transcription["text"]
-    # Print the Text
     print("Text: ", text)
 
     # Sentiment Analysis
@@ -171,13 +151,3 @@ def runAudioRecognition(sttModel, sentimentPipeline, audioToneModel, results):
     results.append(packageSentimentInputsForFusion(sentiment[0]['label'], sentiment[0]['score'] * 100, command))
     results.append(packageToneInputsForFusion(tone[0]['label'], tone[0]['score'] * 100))
     print(results)
-
-def main():
-    audioSpeechToTextModel = loadSpeechToTextModel()
-    audioSentimentModel = loadAudioSentimentModel()
-    audioToneModel = loadAudioToneModel()
-    results = []
-    runAudioRecognition(audioSpeechToTextModel, audioSentimentModel, audioToneModel, results)
-
-if __name__ == "__main__":
-    main()
