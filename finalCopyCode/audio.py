@@ -71,7 +71,7 @@ def packageSentimentInputsForFusion(expressionLabel, confidence, command):
         arousel = 2
         valence = 2
 
-    packagedValues = ('semantic', arousel, valence, confidence, command)
+    packagedValues = ('sentiment', arousel, valence, confidence, command)
     return packagedValues
 
 def packageToneInputsForFusion(expressionLabel, confidence):
