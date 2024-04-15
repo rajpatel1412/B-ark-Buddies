@@ -1,12 +1,18 @@
 # ---- Sources/Documentation used:
 # https://pypi.org/project/opencv-python/
 # https://www.datacamp.com/tutorial/face-detection-python-opencv
+# https://docs.opencv.org/3.4/d8/dfe/classcv_1_1VideoCapture.html
+# https://www.geeksforgeeks.org/face-detection-using-cascade-classifier-using-opencv-python/
+# https://github.com/akash720/Facial-expression-recognition/blob/master/README.md
+# https://stackoverflow.com/questions/76616042/attributeerror-module-pil-image-has-no-attribute-antialias
 
-
+# ---- Libraries
 import cv2
 import time
 import shutil
 import os
+import numpy
+
 from tensorflow import keras
 from keras.models import load_model
 from keras.models import Sequential
@@ -15,19 +21,16 @@ from keras.utils import to_categorical
 from keras import preprocessing
 from PIL import Image
 
-import matplotlib.pyplot as plt
-from matplotlib.image import imread
-import numpy
-
 # ---- Helper Functions
 
+# Loads the pre-trained facial recognition model
 def loadFaceModel():
     # model from: https://github.com/akash720/Facial-expression-recognition/blob/master/README.md
-    # Note: had to train it and then save it with a newer version of keras for some reason in google collab
+    # Note: had to train it and then save it with a newer version of keras, the updated model is included in this directory
     pretrainedModel = load_model("my_model.h5")
     return pretrainedModel
 
-
+# Saves each face in it's own image file, each file name is prefixed with the timestamp so that no image files have the same name
 def createFaceImages(videoFrame, facesFromFrame, facesFolder):
     for face in facesFromFrame:
         # Unpack data for each face
@@ -41,6 +44,7 @@ def createFaceImages(videoFrame, facesFromFrame, facesFolder):
         fileName = facesFolder + str(timestampForImageName) + "_face.jpg"
         cv2.imwrite(fileName, extractedFace)
 
+# Use the provided face detection model to to extract faces from the provided video frame
 def extractFacesFromFrame(videoFrame, faceDetectionModel):
     # Convert frame to grayscale for more efficent face detection
     grayscaleVideoFrame = cv2.cvtColor(videoFrame, cv2.COLOR_BGR2GRAY)
@@ -60,8 +64,9 @@ def extractFacesFromFrame(videoFrame, faceDetectionModel):
 
     return facesFromFrame
 
+# Translate the number label to the string discription for increased readibility 
 def translateNumberToCategory(number):
-      # From the fer2013 data set:
+    # From the fer2013 data set:
     # (0=Angry, 1=Disgust, 2=Fear, 3=Happy, 4=Sad, 5=Surprise, 6=Neutral)
     if number == 0:
         categoryString = 'angry'
@@ -100,7 +105,7 @@ def processImage(imageFilePath):
     reshapeImage = scaledImage.reshape(-1, 48, 48, 1)
     return reshapeImage
 
-# for fusion
+# Translate expression value into arousel and valence metrics, package data into a tuple in preparation for late fusion
 def packageInputsForFusion(expressionValue, confidence):
     expressionLabel = translateNumberToCategory(expressionValue)
     arousel = 0
@@ -132,11 +137,12 @@ def packageInputsForFusion(expressionValue, confidence):
     packagedValues = ('face', arousel, valence, confidence)
     return packagedValues
 
+# If multiple different expressions were detected during recording select the most common expression label
 def selectPrediction(predictionList):
     mostCommonValue = 0
     mostCommonCount = 0
 
-    # find the most common value and store it's index
+    # find the most common value
     for value in predictionList:
         count = predictionList.count(value)
         if count > mostCommonCount:
@@ -145,12 +151,16 @@ def selectPrediction(predictionList):
     
     return mostCommonValue
 
-
+# If multiple different expressions were detected during recording return the last index of the most common expression
+# label, this will be used to select the confidence value that will be passed to into the late fusion process
 def findLastIndexOfMostCommonPrediction(predictionList, mostCommonValue):
     lastIndexOfCommonValue = 0
+    
+    # find and store the index of the most common value
     for index in range(len(predictionList)):
         if predictionList[index] == mostCommonValue:
             lastIndexOfCommonValue = index
+
     return lastIndexOfCommonValue
 
 # ---- Main Code
@@ -164,18 +174,16 @@ def runFacialExpressionRecognition(pretrainedModel, results):
     defaultWebcamIndex = 0
     videoCapture = cv2.VideoCapture(defaultWebcamIndex)
 
-    # Define a variable to keep track of the faces extracted from video frames
-    faceCount = 0
-
     # Create a folder to store the images of the faces if it does not currently exist
     facesFolder = "faces/"
     if os.path.exists(facesFolder):
         shutil.rmtree(facesFolder)
     os.makedirs(facesFolder)
 
-    # take 5 seconds of video
-    start_time = time.time()
-    while time.time() - start_time < 5:
+    # Take 5 seconds of video
+    recordingTime = time.time()
+    while time.time() - recordingTime < 5:
+
         # Get frame to process from video camera
         status, videoFrame = videoCapture.read()
         
@@ -183,52 +191,38 @@ def runFacialExpressionRecognition(pretrainedModel, results):
         if status is False:
             break
 
-        # extract a list of faces from each frame
+        # Extract a list of faces from each frame
         facesFromFrame = extractFacesFromFrame(videoFrame, faceDetectionModel)
 
-        # Create jpgs from list of faces
+        # Create jpgs from list of faces and store them in faces folder
         createFaceImages(videoFrame, facesFromFrame, facesFolder)
 
     # Release the capture
     videoCapture.release()
 
-    #Extract pixel values for each image in the faces folder
-    facesFolder = "faces/"
+    # For each image created, pre-process it, and use model to predict it's label
     imageList = os.listdir(facesFolder)
-
     predictionLabels = []
     confidence = []
 
     for imageFile in imageList:
-        # process the image
+        # Pre-process the image
         imageFilePath = facesFolder + imageFile
         processedImage = processImage(imageFilePath)
 
-        # use model to predict
+        # Use model to predict
         probabilityDistribution = pretrainedModel.predict(processedImage)
         category = numpy.argmax(probabilityDistribution)
         predictionLabels.append(category)
 
-        # calculate confidence from probability
+        # Calculate confidence from probability
         confidencePercentage = probabilityDistribution[0][category] * 100
         confidence.append(confidencePercentage)
     
+    # Select prediction and confidence values to pass to late fusion process
     selectedPrediction = selectPrediction(predictionLabels)
     selectedPredictionIndex = findLastIndexOfMostCommonPrediction(predictionLabels, selectedPrediction)
     selectedPredictionConfidence = confidence[selectedPredictionIndex]
 
+    # Add prediction and confidence values to results list for fusion
     results.append(packageInputsForFusion(selectedPrediction, selectedPredictionConfidence))
-
-
-
-# def main():
-#     print("audio audio")
-#     videoModel = loadFaceModel()
-#     results = []
-#     while(1):
-#         runFacialExpressionRecognition(videoModel, results)
-#     print("done")
-
-
-# if __name__ == "__main__":
-#     main()
