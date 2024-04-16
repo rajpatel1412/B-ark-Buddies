@@ -1,3 +1,9 @@
+# Documentation/Sources:
+# https://github.com/openai/whisper
+# https://huggingface.co/nateraw/bert-base-uncased-emotion
+# https://huggingface.co/ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition
+# https://stackoverflow.com/questions/40704026/voice-recording-using-pyaudio
+
 # Suppress warning for a cleaner output
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -88,6 +94,8 @@ def packageToneInputsForFusion(expressionLabel, confidence):
     return packagedValues
 
 def runAudioRecognition(sttModel, sentimentPipeline, audioToneModel, results):
+    # Audio collection adapted from the stackoverflow post
+    # https://stackoverflow.com/questions/40704026/voice-recording-using-pyaudio
     # Settings for audio collection
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
